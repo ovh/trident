@@ -9585,7 +9585,7 @@ func TestListLogLayers(t *testing.T) {
 	expected := []string{
 		"all", "autogrow", "azure-netapp-files", "core", "crd_frontend", "csi_frontend", "docker_frontend",
 		"fake", "ontap-nas", "ontap-nas-economy", "ontap-nas-flexgroup", "ontap-san", "ontap-san-economy",
-		"persistent_store", "rest_frontend", "solidfire-san",
+		"ovh-efs", "persistent_store", "rest_frontend", "solidfire-san",
 	}
 	assert.Equal(t, expected, layers)
 	assert.NoError(t, err)
