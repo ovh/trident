@@ -1185,6 +1185,7 @@ type PersistentStorageBackendConfig struct {
 	AzureConfig             *drivers.AzureNASStorageDriverConfig  `json:"azure_config,omitempty"`
 	GCPConfig               *drivers.GCPNFSStorageDriverConfig    `json:"gcp_config,omitempty"`
 	GCNVConfig              *drivers.GCNVNASStorageDriverConfig   `json:"gcnv_config,omitempty"`
+	OVHConfig               *drivers.OVHNASStorageDriverConfig    `json:"ovh_config,omitempty"`
 	FakeStorageDriverConfig *drivers.FakeStorageDriverConfig      `json:"fake_config,omitempty"`
 }
 
@@ -1202,6 +1203,8 @@ func (psbc *PersistentStorageBackendConfig) GetDriverConfig() (drivers.DriverCon
 		driverConfig = psbc.GCPConfig
 	case psbc.GCNVConfig != nil:
 		driverConfig = psbc.GCNVConfig
+	case psbc.OVHConfig != nil:
+		driverConfig = psbc.OVHConfig
 	case psbc.FakeStorageDriverConfig != nil:
 		driverConfig = psbc.FakeStorageDriverConfig
 	default:
@@ -1260,6 +1263,8 @@ func (p *BackendPersistent) MarshalConfig() (string, error) {
 		bytes, err = json.Marshal(p.Config.GCPConfig)
 	case p.Config.GCNVConfig != nil:
 		bytes, err = json.Marshal(p.Config.GCNVConfig)
+	case p.Config.OVHConfig != nil:
+		bytes, err = json.Marshal(p.Config.OVHConfig)
 	case p.Config.FakeStorageDriverConfig != nil:
 		bytes, err = json.Marshal(p.Config.FakeStorageDriverConfig)
 	default:

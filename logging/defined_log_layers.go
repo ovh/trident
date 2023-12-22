@@ -27,6 +27,7 @@ const (
 	LogLayerOntapNASQtreeDriver     = LogLayer(OntapNASQtreeStorageDriverName)
 	LogLayerOntapSANDriver          = LogLayer(OntapSANStorageDriverName)
 	LogLayerOntapSANEcoDriver       = LogLayer(OntapSANEconomyStorageDriverName)
+	LogLayerOVHNASDriver            = LogLayer(OVHNASStorageDriverName)
 	LogLayerFakeDriver              = LogLayer(FakeStorageDriverName)
 	LogLayerUtils                   = LogLayer("utils")
 	LogLayerAll                     = LogLayer("all")
@@ -48,6 +49,7 @@ var layers = []LogLayer{
 	LogLayerOntapNASQtreeDriver,
 	LogLayerOntapSANDriver,
 	LogLayerOntapSANEcoDriver,
+	LogLayerOVHNASDriver,
 	LogLayerFakeDriver,
 	LogLayerAll,
 }

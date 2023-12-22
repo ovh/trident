@@ -19,6 +19,7 @@ import (
 	"github.com/netapp/trident/storage_drivers/fake"
 	"github.com/netapp/trident/storage_drivers/gcp"
 	"github.com/netapp/trident/storage_drivers/ontap"
+	"github.com/netapp/trident/storage_drivers/ovh"
 	"github.com/netapp/trident/storage_drivers/solidfire"
 )
 
@@ -132,6 +133,8 @@ func GetStorageDriver(driverName string) (storage.Driver, error) {
 		storageDriver = &gcp.NFSStorageDriver{}
 	case config.GCNVNASStorageDriverName:
 		storageDriver = &gcp.NASStorageDriver{}
+	case config.OVHNASStorageDriverName:
+		storageDriver = &ovh.NASStorageDriver{}
 	case config.FakeStorageDriverName:
 		storageDriver = &fake.StorageDriver{}
 	default:

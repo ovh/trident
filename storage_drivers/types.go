@@ -54,6 +54,8 @@ func GetDriverConfigByName(driverName string) (DriverConfig, error) {
 		storageDriverConfig = &GCPNFSStorageDriverConfig{}
 	case trident.GCNVNASStorageDriverName:
 		storageDriverConfig = &GCNVNASStorageDriverConfig{}
+	case trident.OVHNASStorageDriverName:
+		storageDriverConfig = &OVHNASStorageDriverConfig{}
 	case trident.FakeStorageDriverName:
 		storageDriverConfig = &FakeStorageDriverConfig{}
 	default:
@@ -171,7 +173,7 @@ type AWSConfig struct {
 type StorageBackendPool interface {
 	OntapFlexGroupStorageBackendPool | OntapStorageBackendPool | OntapEconomyStorageBackendPool |
 		ANFStorageBackendPool | SolidfireStorageBackendPool |
-		GCPNFSStorageBackendPool | GCNVNASStorageBackendPool
+		GCPNFSStorageBackendPool | GCNVNASStorageBackendPool | OVHNASStorageBackendPool
 }
 
 // OntapFlexGroupStorageBackendPool is a non-overlapping section of an ONTAP flexgroup backend that may be used for
@@ -820,7 +822,7 @@ func (d *GCNVNASStorageDriverConfig) InjectSecrets(secretMap map[string]string) 
 }
 
 // ExtractSecrets function builds a map of any sensitive fields it contains (credentials, etc.),
-// and returns the the map.
+// and returns the map.
 func (d *GCNVNASStorageDriverConfig) ExtractSecrets() map[string]string {
 	secretMap := make(map[string]string)
 
@@ -860,6 +862,131 @@ func (d GCNVNASStorageDriverConfig) CheckForCRDControllerForbiddenAttributes() [
 func (d GCNVNASStorageDriverConfig) SpecOnlyValidation() error {
 	if forbiddenList := d.CheckForCRDControllerForbiddenAttributes(); len(forbiddenList) > 0 {
 		return fmt.Errorf("input contains forbidden attributes: %v", forbiddenList)
+	}
+
+	return nil
+}
+
+// TODO
+type OVHNASStorageDriverConfig struct {
+	*CommonStorageDriverConfig
+	// ServiceID           string `json:"serviceID"`
+	ClientID            string `json:"clientID"`
+	ClientSecret        string `json:"clientSecret"`
+	ClientLocation      string `json:"clientLocation"`
+	Location            string `json:"location"`
+	NFSMountOptions     string `json:"nfsMountOptions"`
+	VolumeCreateTimeout string `json:"volumeCreateTimeout"`
+	APITimeout          string `json:"apiTimeout"`
+	MaxCacheAge         string `json:"maxCacheAge"`
+
+	OVHNASStorageDriverPool
+	Storage []OVHNASStorageDriverPool `json:"storage"`
+}
+
+// OVHNASStorageDriverPool is the virtual pool definition for the OVH driver.
+type OVHNASStorageDriverPool struct {
+	Labels        map[string]string `json:"labels"`
+	Region        string            `json:"location"`
+	Zone          string            `json:"zone"`
+	ServiceLevel  string            `json:"serviceLevel"`
+	CapacityPools []string          `json:"capacityPools"`
+	//	StoragePools                   []string            `json:"storagePools"`
+	SupportedTopologies            []map[string]string `json:"supportedTopologies"`
+	NASType                        string              `json:"nasType"`
+	OVHStorageDriverConfigDefaults `json:"defaults"`
+}
+
+// OVHNASStorageBackendPool is a non-overlapping section of a OVH backend that may be used for provisioning storage
+type OVHNASStorageBackendPool struct {
+	Location string `json:"location"`
+	// StoragePool string `json:"storagePool"`
+	CapacityPool string `json:"capacityPool"`
+}
+
+type OVHStorageDriverConfigDefaults struct {
+	ExportRule  string `json:"exportRule"`
+	SnapshotDir string `json:"snapshotDir"`
+	CommonStorageDriverConfigDefaults
+}
+
+// String implements stringer interface for OVHNASStorageDriverConfig
+func (d OVHNASStorageDriverConfig) String() string {
+	return convert.ToStringRedacted(&d, []string{"ClientID", "ClientSecret"}, nil)
+}
+
+// GoString implements GoStringer interface for OVHNASStorageDriverConfig
+func (d OVHNASStorageDriverConfig) GoString() string { return d.String() }
+
+func (d *OVHNASStorageDriverConfig) Marshal() ([]byte, error) {
+	SanitizeCommonStorageDriverConfig(d.CommonStorageDriverConfig)
+	bytes, err := json.Marshal(d)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal OVHNASStorageDriverConfig: %v", err)
+	}
+	return bytes, nil
+}
+
+// InjectSecrets replaces sensitive fields in the config with the field values in the map.
+func (d *OVHNASStorageDriverConfig) InjectSecrets(secretMap map[string]string) error {
+	// NOTE: When the backend secrets are read in the CRD persistence layer they are converted to lower-case.
+
+	var ok bool
+	if d.ClientID, ok = secretMap[strings.ToLower("ClientID")]; !ok {
+		return injectionError("ClientID")
+	}
+	if d.ClientSecret, ok = secretMap[strings.ToLower("ClientSecret")]; !ok {
+		return injectionError("ClientSecret")
+	}
+
+	return nil
+}
+
+// ExtractSecrets builds a map of any sensitive fields it contains (credentials, etc.)
+// and returns the map.
+func (d *OVHNASStorageDriverConfig) ExtractSecrets() map[string]string {
+	secretMap := make(map[string]string)
+
+	secretMap["ClientID"] = d.ClientID
+	secretMap["ClientSecret"] = d.ClientSecret
+
+	return secretMap
+}
+
+// ResetSecrets removes sensitive fields it contains (credentials, etc).
+func (d *OVHNASStorageDriverConfig) ResetSecrets() {
+	d.ClientID = ""
+	d.ClientSecret = ""
+}
+
+// HideSensitiveWithSecretName replaces sensitive fields it contains (credentials, etc.)
+// with secretName.
+func (d *OVHNASStorageDriverConfig) HideSensitiveWithSecretName(secretName string) {
+	d.ClientID = secretName
+	d.ClientSecret = secretName
+}
+
+// GetAndHideSensitive builds a map of any sensitive fields it contains (credentials, etc),
+// replaces those fields with secretName and returns the map.
+func (d *OVHNASStorageDriverConfig) GetAndHideSensitive(secretName string) map[string]string {
+	secretMap := d.ExtractSecrets()
+	d.HideSensitiveWithSecretName(secretName)
+
+	return secretMap
+}
+
+// CheckForCRDControllerForbiddenAttributes checks config for the keys forbidden by the CRD controller and returns them.
+func (d *OVHNASStorageDriverConfig) CheckForCRDControllerForbiddenAttributes() []string {
+	return checkMapContainsAttributes(d.ExtractSecrets())
+}
+
+func (d *OVHNASStorageDriverConfig) SpecOnlyValidation() error {
+	if forbiddenList := d.CheckForCRDControllerForbiddenAttributes(); len(forbiddenList) > 0 {
+		return fmt.Errorf("input contains forbidden attributes: %v", forbiddenList)
+	}
+
+	if !d.HasCredentials() {
+		return fmt.Errorf("input is missing the credentials field")
 	}
 
 	return nil

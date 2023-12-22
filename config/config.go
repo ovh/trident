@@ -118,6 +118,7 @@ const (
 	AzureNASStorageDriverName          = "azure-netapp-files"
 	GCPNFSStorageDriverName            = "gcp-cvs"
 	GCNVNASStorageDriverName           = "google-cloud-netapp-volumes"
+	OVHNASStorageDriverName            = "ovh-efs"
 	FakeStorageDriverName              = "fake"
 
 	/* REST frontend constants */

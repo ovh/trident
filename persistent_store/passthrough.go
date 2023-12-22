@@ -169,6 +169,8 @@ func (c *PassthroughClient) unmarshalConfig(ctx context.Context, fileContents []
 		configType = "gcp_config"
 	case config.GCNVNASStorageDriverName:
 		configType = "gcnv_config"
+	case config.OVHNASStorageDriverName:
+		configType = "ovh_config"
 	case config.FakeStorageDriverName:
 		configType = "fake_config"
 	default:
