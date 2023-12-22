@@ -35,6 +35,7 @@ const (
 	LogLayerOntapNASQtreeDriver     = LogLayer(OntapNASQtreeStorageDriverName)
 	LogLayerOntapSANDriver          = LogLayer(OntapSANStorageDriverName)
 	LogLayerOntapSANEcoDriver       = LogLayer(OntapSANEconomyStorageDriverName)
+	LogLayerOVHNASDriver            = LogLayer(OVHNASStorageDriverName)
 	LogLayerOntapAPI                = LogLayer("ontap_api")
 	LogLayerKubernetesAPI           = LogLayer("kubernetes_api")
 	LogLayerFakeDriver              = LogLayer(FakeStorageDriverName)
@@ -58,6 +59,7 @@ var Layers = []LogLayer{
 	LogLayerOntapNASQtreeDriver,
 	LogLayerOntapSANDriver,
 	LogLayerOntapSANEcoDriver,
+	LogLayerOVHNASDriver,
 	LogLayerFakeDriver,
 	LogLayerAutogrow,
 	LogLayerAll,
