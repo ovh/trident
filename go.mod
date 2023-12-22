@@ -43,6 +43,7 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/openshift/api v0.0.0-20260205045418-81371d13d1fc
+	github.com/ovh/go-ovh v1.7.0
 	github.com/panjf2000/ants/v2 v2.11.5
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
@@ -75,6 +76,8 @@ require (
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // github.com/kubernetes/utils
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.14.5 // github.com/kubernetes-sigs/cloud-provider-azure
 )
+
+require github.com/maxatome/tdhttpmock v1.0.0
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
@@ -154,6 +157,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
+	github.com/maxatome/go-testdeep v1.14.0 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -188,6 +192,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
