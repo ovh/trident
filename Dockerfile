@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 ARG ARCH=amd64
 ARG DEPS_IMAGE=alpine:3
 
