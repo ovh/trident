@@ -4218,6 +4218,9 @@ func TestResize(t *testing.T) {
 	mockAPI.EXPECT().RefreshOVHResources(ctx).Return(nil).Times(1)
 	mockAPI.EXPECT().Volume(ctx, volConfig).Return(volume, nil).Times(1)
 	mockAPI.EXPECT().ResizeVolume(ctx, volume, int64(newSize/(1<<30))).Return(nil).Times(1)
+	mockAPI.EXPECT().WaitForVolumeStatus(ctx, volume, api.VolumeStatusAvailable,
+		[]string{api.VolumeStatusExtendingError, api.VolumeStatusError}, driver.defaultTimeout()).
+		Return(api.VolumeStatusAvailable, nil).Times(1)
 
 	result := driver.Resize(ctx, volConfig, newSize)
 
@@ -4338,6 +4341,26 @@ func TestResize_VolumeResizeFailed(t *testing.T) {
 
 	assert.NotNil(t, result, "expected error")
 	assert.Equal(t, VolumeSizeStr, volConfig.Size, "size mismatch")
+}
+
+func TestResize_WaitForVolumeStatusFailed(t *testing.T) {
+	mockAPI, driver := newMockEFSDriver(t)
+	driver.initializeTelemetry(ctx, BackendUUID)
+
+	volConfig, volume := getStructsForResizeVolume(ctx, driver)
+	newSize := uint64(VolumeSizeI64 * 2)
+
+	mockAPI.EXPECT().RefreshOVHResources(ctx).Return(nil).Times(1)
+	mockAPI.EXPECT().Volume(ctx, volConfig).Return(volume, nil).Times(1)
+	mockAPI.EXPECT().ResizeVolume(ctx, volume, int64(newSize/(1<<30))).Return(nil).Times(1)
+	mockAPI.EXPECT().WaitForVolumeStatus(ctx, volume, api.VolumeStatusAvailable,
+		[]string{api.VolumeStatusExtendingError, api.VolumeStatusError}, driver.defaultTimeout()).
+		Return("", errFailed).Times(1)
+
+	result := driver.Resize(ctx, volConfig, newSize)
+
+	assert.NotNil(t, result, "expected error")
+	assert.Equal(t, VolumeSizeStr, volConfig.Size, "size should be unchanged when wait fails")
 }
 
 func TestGetStorageBackendSpecs(t *testing.T) {

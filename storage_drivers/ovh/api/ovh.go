@@ -641,7 +641,7 @@ func (c Client) ResizeVolume(ctx context.Context, volume *Volume, newSizeGigabyt
 
 	Logc(ctx).WithFields(logFields).Debug("Volume resize request issued.")
 
-	// TODO: wait for resize completion
+	// Resize is asynchronous; the driver waits for completion via WaitForVolumeStatus.
 
 	return nil
 }
