@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	MinimumVolumeSizeBytes       = uint64(1073741824)   // 100 GiB
-	MinimumEFSVolumeSizeBytes    = uint64(107374182400) // 100 GiB
+	MinimumVolumeSizeBytes       = uint64(1073741824)  // 1 GiB
+	MinimumEFSVolumeSizeBytes    = uint64(53687091200) // 50 GiB
 	MaximumVolumesPerStoragePool = 50
 
 	defaultNFSMountOptions = "rw,hard,rsize=65536,wsize=65536,nfsvers=3,tcp"
@@ -679,7 +679,7 @@ func (d *NASStorageDriver) Create(ctx context.Context, volConfig *storage.Volume
 	if sizeBytes < MinimumEFSVolumeSizeBytes {
 		Logc(ctx).WithFields(LogFields{
 			"sizeBytes": sizeBytes,
-		}).Warning("Requested size is too small. Setting volume to the minimum allowable (100 GiB).")
+		}).Warning("Requested size is too small. Setting volume to the minimum allowable (50 GiB).")
 
 		sizeBytes = MinimumEFSVolumeSizeBytes
 	}
