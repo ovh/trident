@@ -30,14 +30,14 @@ import (
 )
 
 const (
-	defaultVolumeSizeStr = "107374182400"
+	defaultVolumeSizeStr = "53687091200"
 
 	BackendUUID   = "21ec8941-c845-4675-b7fe-d19413df324e"
 	VolumeID      = "2ac741dd-3438-4643-b4b0-879251f92cf4"
 	SnapshotID    = "987b71e8-1e08-448c-b5a4-6f6d5b9a7d8a"
 	SnapshotName  = "snapshot-987b71e8-1e08-448c-b5a4-6f6d5b9a7d8a"
-	VolumeSizeStr = "107374182400"
-	VolumeSizeI64 = int64(107374182400)
+	VolumeSizeStr = "53687091200"
+	VolumeSizeI64 = int64(53687091200)
 )
 
 var (
