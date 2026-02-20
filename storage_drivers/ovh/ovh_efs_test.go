@@ -942,7 +942,7 @@ func getStructsForCreateNFSVolume(ctx context.Context, driver *NASStorageDriver,
 	createRequest := &api.VolumeCreateRequest{
 		ServiceID:       capacityPool.ID,
 		Name:            volConfig.Name,
-		SizeInGigabytes: 100,
+		SizeInGigabytes: 50,
 		Protocol:        api.ProtocolTypeNFS,
 		MountPointName:  volConfig.InternalName,
 	}
