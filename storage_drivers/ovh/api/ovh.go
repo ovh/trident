@@ -31,7 +31,7 @@ var (
 	snapshotIDRegex = regexp.MustCompile(`^/storage/netapp/(?P<serviceName>[^/]+)/share/(?P<share>[^/]+)/snapshot/(?P<snapshot>[^/]+)$`)
 )
 
-// ClientConfig holds configuraiton data for the API driver object.
+// ClientConfig holds configuration data for the API driver object.
 type ClientConfig struct {
 	StorageDriverName string
 
@@ -54,7 +54,7 @@ type OVHEFSClient struct {
 	OVHResources
 }
 
-// Client encapsulates connnection details.
+// Client encapsulates connection details.
 type Client struct {
 	config    *ClientConfig
 	sdkClient *OVHEFSClient

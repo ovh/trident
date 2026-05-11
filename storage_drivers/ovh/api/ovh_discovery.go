@@ -60,7 +60,7 @@ func (c Client) DiscoverOVHResources(ctx context.Context) (returnError error) {
 
 	defer func() {
 		if returnError != nil {
-			Logc(ctx).WithError(returnError).Debug("Discovery error, not retaining any discovered resources.i")
+			Logc(ctx).WithError(returnError).Debug("Discovery error, not retaining any discovered resources.")
 			return
 		}
 
@@ -77,7 +77,7 @@ func (c Client) DiscoverOVHResources(ctx context.Context) (returnError error) {
 		return
 	}
 
-	// Update maps with all data form discovered capacity pools
+	// Update maps with all data from discovered capacity pools
 	for _, cPool := range *cPools {
 		newCapacityPoolsMap[cPool.Name] = cPool
 	}
@@ -93,14 +93,14 @@ func (c Client) DiscoverOVHResources(ctx context.Context) (returnError error) {
 
 	Logc(ctx).WithFields(LogFields{
 		"capacityPools": numCapacityPools,
-	}).Info("Discoverd EFS resources.")
+	}).Info("Discovered EFS resources.")
 
 	return
 }
 
 // dumpOVHResources writes a hierarchical representation of discovered resources to the log.
 func (c Client) dumpOVHResources(ctx context.Context, driverName string, discoveryTraceEnabled bool) {
-	Logd(ctx, driverName, discoveryTraceEnabled).Tracef("Dsicovered OVH Resources:")
+	Logd(ctx, driverName, discoveryTraceEnabled).Tracef("Discovered OVH Resources:")
 
 	for _, cp := range c.sdkClient.OVHResources.CapacityPoolMap {
 		Logd(ctx, driverName, discoveryTraceEnabled).Tracef("CPool: %s, [%s, %s]",
@@ -355,7 +355,7 @@ func (c Client) CapacityPoolsForStoragePool(
 // EnsureVolumeInValidCapacityPool checks whether the specified volume exists in any capacity pool that is
 // referenced by the backend config. It returns nil if so, or if no capacity pools are named in the config.
 func (c Client) EnsureVolumeInValidCapacityPool(ctx context.Context, volume *Volume) error {
-	// Get a list of all capcait pools referenced in the config
+	// Get a list of all capacity pools referenced in the config
 	allCapacityPools := c.CapacityPoolsForStoragePools(ctx)
 
 	// If we aren't restricting capacity pools, any capacity pool is OK

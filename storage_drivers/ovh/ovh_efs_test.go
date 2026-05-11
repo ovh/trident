@@ -4153,9 +4153,14 @@ func TestGet(t *testing.T) {
 	volume := &api.Volume{}
 
 	mockAPI.EXPECT().RefreshOVHResources(ctx).Return(nil).Times(1)
-	mockAPI.EXPECT().VolumeByMountPointName(ctx, "volume1").Return(volume, nil).Times(1)
+	mockAPI.EXPECT().VolumeByMountPointName(ctx, "pvc-testvol1").Return(volume, nil).Times(1)
 
-	result := driver.Get(ctx, "volume1")
+	volConfig := &storage.VolumeConfig{
+		Name:         "tesvol1",
+		InternalName: "pvc-testvol1",
+	}
+
+	result := driver.Get(ctx, volConfig)
 
 	assert.NoError(t, result, "expect no error")
 }
@@ -4165,7 +4170,12 @@ func TestGet_DiscoveryFailed(t *testing.T) {
 
 	mockAPI.EXPECT().RefreshOVHResources(ctx).Return(errFailed).Times(1)
 
-	result := driver.Get(ctx, "volume1")
+	volConfig := &storage.VolumeConfig{
+		Name:         "tesvol1",
+		InternalName: "pvc-testvol1",
+	}
+
+	result := driver.Get(ctx, volConfig)
 
 	assert.Error(t, result, "expected error")
 }
@@ -4174,8 +4184,14 @@ func TestGet_NotFound(t *testing.T) {
 	mockAPI, driver := newMockEFSDriver(t)
 
 	mockAPI.EXPECT().RefreshOVHResources(ctx).Return(nil).Times(1)
-	mockAPI.EXPECT().VolumeByMountPointName(ctx, "volume1").Return(nil, errors.NotFoundError("not found")).Times(1)
-	result := driver.Get(ctx, "volume1")
+	mockAPI.EXPECT().VolumeByMountPointName(ctx, "pvc-testvol1").Return(nil, errors.NotFoundError("not found")).Times(1)
+
+	volConfig := &storage.VolumeConfig{
+		Name:         "tesvol1",
+		InternalName: "pvc-testvol1",
+	}
+
+	result := driver.Get(ctx, volConfig)
 
 	assert.Error(t, result, "expected error")
 }
@@ -4370,8 +4386,8 @@ func TestGetStorageBackendSpecs(t *testing.T) {
 	driver.initializeStoragePools(ctx)
 	driver.initializeTelemetry(ctx, BackendUUID)
 
-	backend := &storage.StorageBackend{}
-	backend.SetStorage(make(map[string]storage.Pool))
+	backend := storage.NewTestStorageBackend()
+	backend.ClearStoragePools()
 
 	result := driver.GetStorageBackendSpecs(ctx, backend)
 
@@ -4379,7 +4395,9 @@ func TestGetStorageBackendSpecs(t *testing.T) {
 	assert.Equal(t, "ovhefs_1-cli", backend.Name(), "backend name mismatch")
 	for _, pool := range driver.pools {
 		assert.Equal(t, backend, pool.Backend(), "pool-backend mismatch")
-		assert.Equal(t, pool, backend.Storage()["ovhefs_1-cli_pool"], "backend pool mismatch")
+		p, ok := backend.StoragePools().Load("ovhefs_1-cli_pool")
+		assert.True(t, ok)
+		assert.Equal(t, pool, p.(storage.Pool), "backend-pool mismatch")
 	}
 }
 
