@@ -67,13 +67,13 @@ func newTestEFSDriver(mockAPI api.OVHClient) *NASStorageDriver {
 		ClientID:            api.ClientID,
 		ClientSecret:        api.ClientSecret,
 		NFSMountOptions:     "rw,hard,rsize=65536,wsize=65536,nfsvers=3,tcp",
-		VolumeCreateTimeout: "30",
+		VolumeCreateTimeout: "300",
 	}
 
 	return &NASStorageDriver{
 		Config:              config,
 		API:                 mockAPI,
-		volumeCreateTimeout: 30 * time.Second,
+		volumeCreateTimeout: 300 * time.Second,
 	}
 }
 
@@ -268,7 +268,7 @@ func TestInitialize(t *testing.T) {
 	assert.NotNil(t, driver.Config, "config is nil")
 	assert.Equal(t, 1, len(driver.pools), "wrong number of pools")
 	assert.Equal(t, api.BackendUUID, driver.telemetry.TridentBackendUUID, "wrong backend UUID")
-	assert.Equal(t, driver.volumeCreateTimeout, 30*time.Second, "volume timeout mismatch")
+	assert.Equal(t, driver.volumeCreateTimeout, 300*time.Second, "volume timeout mismatch")
 	assert.True(t, driver.Initialized(), "driver is not initialized")
 }
 
@@ -690,7 +690,7 @@ func TestPopulateConfigurationDefaults_AllSet(t *testing.T) {
 			LimitVolumeSize: "123456789000",
 		},
 		NFSMountOptions:     "nfsvers=4.1",
-		VolumeCreateTimeout: "30",
+		VolumeCreateTimeout: "300",
 		OVHNASStorageDriverPool: drivers.OVHNASStorageDriverPool{
 			OVHStorageDriverConfigDefaults: drivers.OVHStorageDriverConfigDefaults{
 				CommonStorageDriverConfigDefaults: drivers.CommonStorageDriverConfigDefaults{
@@ -713,7 +713,7 @@ func TestPopulateConfigurationDefaults_AllSet(t *testing.T) {
 	assert.Equal(t, "1234567890", driver.Config.Size, "size mismatch")
 	assert.Equal(t, "premium", driver.Config.ServiceLevel, "service level mismatch")
 	assert.Equal(t, "nfsvers=4.1", driver.Config.NFSMountOptions, "NFS mount options mismatch")
-	assert.Equal(t, "30", driver.Config.VolumeCreateTimeout, "volume create timeout mismatch")
+	assert.Equal(t, "300", driver.Config.VolumeCreateTimeout, "volume create timeout mismatch")
 	assert.Equal(t, "123456789000", driver.Config.LimitVolumeSize, "limit volume size mismatch")
 	assert.Equal(t, "1.1.1.1/32", driver.Config.ExportRule, "export rule mismatch")
 }
