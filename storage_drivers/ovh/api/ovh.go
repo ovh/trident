@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	VolumeCreateTimeout = 30 * time.Second
+	VolumeCreateTimeout = 300 * time.Second
 	DefaultTimeout      = 120 * time.Second
 )
 
