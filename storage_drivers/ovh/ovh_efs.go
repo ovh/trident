@@ -122,8 +122,8 @@ func (d *NASStorageDriver) validateVolumeName(name string) error {
 
 func (d *NASStorageDriver) validateCreationToken(name string) error {
 	if !volumeCreationTokenRegex.MatchString(name) {
-		return fmt.Errorf("volume internal name '%s' is not allowed; it be 1-255 characters long, "+
-			"begin with a letter, and contain only letters, digits, hyphes and underscores", name)
+		return fmt.Errorf("volume internal name '%s' is not allowed; it must be 1-255 characters long, "+
+			"begin with a letter, and contain only letters, digits, hyphens and underscores", name)
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func (d *NASStorageDriver) Terminate(ctx context.Context, _ string) {
 func (d *NASStorageDriver) populateConfigurationDefaults(
 	ctx context.Context, config *drivers.OVHNASStorageDriverConfig,
 ) error {
-	fields := LogFields{"Method": "populateConfigurationDefaults", "Type": "NFSStorageDriver"}
+	fields := LogFields{"Method": "populateConfigurationDefaults", "Type": "NASStorageDriver"}
 	Logd(ctx, config.StorageDriverName, config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> populateConfigurationDefaults")
 	defer Logd(ctx, config.StorageDriverName, config.DebugTraceFlags["method"]).WithFields(fields).Trace("<<<< populateConfigurationDefaults")
 
@@ -475,7 +475,7 @@ func (d *NASStorageDriver) initializeOVHConfig(
 func (d *NASStorageDriver) initializeOVHAPIClient(
 	ctx context.Context, config *drivers.OVHNASStorageDriverConfig,
 ) error {
-	fields := LogFields{"Method": "initializeOVHAPIClient", "Type": "NFSStorageDriver"}
+	fields := LogFields{"Method": "initializeOVHAPIClient", "Type": "NASStorageDriver"}
 	Logd(ctx, config.StorageDriverName, config.DebugTraceFlags["method"]).WithFields(fields).
 		Trace(">>>> initializeOVHAPIClient")
 	defer Logd(ctx, config.StorageDriverName, config.DebugTraceFlags["method"]).WithFields(fields).
@@ -530,7 +530,7 @@ func (d *NASStorageDriver) initializeOVHAPIClient(
 
 // validate ensures the driver configuration and execution environment are valid and working.
 func (d *NASStorageDriver) validate(ctx context.Context) error {
-	fields := LogFields{"Method": "validate", "Type": "NAStorageDriver"}
+	fields := LogFields{"Method": "validate", "Type": "NASStorageDriver"}
 	Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> validate")
 	defer Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace("<<<< validate")
 
@@ -643,7 +643,7 @@ func (d *NASStorageDriver) Create(ctx context.Context, volConfig *storage.Volume
 		if exportRulesExists {
 			for _, rule := range exportRules {
 				if rule.Status == api.ExportRuleStatusApplying || rule.Status == api.ExportRuleStatusQueuedToApply {
-					// This is a retry and the volume export rule(s) stil aren't ready, so no need to wait futher.
+					// This is a retry and the volume export rule(s) still aren't ready, so no need to wait further.
 					return errors.VolumeCreatingError(
 						fmt.Sprintf("volume export rule(s) state is not %s", api.ExportRuleStatusActive))
 				}
@@ -652,7 +652,7 @@ func (d *NASStorageDriver) Create(ctx context.Context, volConfig *storage.Volume
 			Logc(ctx).WithFields(LogFields{
 				"name":  name,
 				"rules": exportRules,
-			}).Warning("Volume export rules already exists.")
+			}).Warning("Volume export rules already exist.")
 
 			// No specific error is returned, so return a generic volume exists error
 			return drivers.NewVolumeExistsError(name)
@@ -721,7 +721,7 @@ func (d *NASStorageDriver) Create(ctx context.Context, volConfig *storage.Volume
 
 	// TODO: (feat) volume labels support
 
-	// NOTE: experimental. EFS does not have mutli-AZ support.
+	// NOTE: experimental. EFS does not have multi-AZ support.
 	// The volume will be created inside the region requested by the volume topology
 	// if the driver backend supports it.
 	// TODO: (feat) multi-az support
@@ -941,7 +941,7 @@ func (d *NASStorageDriver) CreateClone(
 	var exportRule string
 	if len(ACLs) >= 1 {
 		exportRule = ACLs[0].AccessTo
-		for i := 1; i < len(ACLs)-1; i++ {
+		for i := 1; i < len(ACLs); i++ {
 			exportRule += fmt.Sprintf(",%s", ACLs[i].AccessTo)
 		}
 	}
@@ -972,7 +972,7 @@ func (d *NASStorageDriver) CreateClone(
 func (d *NASStorageDriver) Import(ctx context.Context, volConfig *storage.VolumeConfig, originalName string) error {
 	fields := LogFields{
 		"Method":       "Import",
-		"Type":         "NFSStorageDriver",
+		"Type":         "NASStorageDriver",
 		"originalName": originalName,
 		"newName":      volConfig.InternalName,
 	}
@@ -1025,7 +1025,7 @@ func (d *NASStorageDriver) Import(ctx context.Context, volConfig *storage.Volume
 			return fmt.Errorf("could not import volume %s, SMB/CIFS protocol is not supported by this driver", originalName)
 		} else if d.Config.NASType == sa.NFS && volume.Protocol == api.ProtocolTypeNFS {
 			// NOTE: skipped modify for UNIX permissions,
-			// snapshotDir acces and export rules
+			// snapshotDir access and export rules
 
 			// TODO: (feat) UNIX permissions
 			// TODO: (feat) snapshot dir access
@@ -1034,7 +1034,7 @@ func (d *NASStorageDriver) Import(ctx context.Context, volConfig *storage.Volume
 		}
 	}
 
-	// The volume ID cannot be changed, so it as the internal name
+	// The volume ID cannot be changed, so use it as the internal name
 	volConfig.InternalName = originalName
 
 	// Always save the ID, so we can find the volume efficiently later
@@ -1073,11 +1073,12 @@ func (d *NASStorageDriver) getTelemetryLabels(ctx context.Context) string {
 
 // updateTelemetryLabels updates a volume's labels to include the standard telemetry labels.
 func (d *NASStorageDriver) updateTelemetryLabels(ctx context.Context, volume *api.Volume) map[string]string {
-	panic("implement me")
+	Logc(ctx).Errorf("updateTelemetry method is not supported. Volume labels will not be updated.")
+	return nil
 }
 
-// waitForVolumeCreate wait for volume creation to complete by reaching the Available state. If the
-// vollume reaches a terminal state (Error), the volume is deleted. If the wait times out and the volume
+// waitForVolumeCreate waits for volume creation to complete by reaching the Available state. If the
+// volume reaches a terminal state (Error), the volume is deleted. If the wait times out and the volume
 // is still creating, a VolumeCreatingError is returned so the caller may try again.
 func (d *NASStorageDriver) waitForVolumeCreate(ctx context.Context, volume *api.Volume) error {
 	state, err := d.API.WaitForVolumeStatus(
@@ -1131,7 +1132,7 @@ func (d *NASStorageDriver) Destroy(ctx context.Context, volConfig *storage.Volum
 
 	// Update resource cache as needed
 	if err = d.API.RefreshOVHResources(ctx); err != nil {
-		return fmt.Errorf("could not update OVHNF resource cache; %v", err)
+		return fmt.Errorf("could not update OVH EFS resource cache; %v", err)
 	}
 
 	hasAutomaticSnapshot := false
@@ -1200,7 +1201,7 @@ func (d *NASStorageDriver) deleteAutomaticSnapshot(
 		"cloneName":       cloneName,
 	}
 
-	Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> deleteAutomaticSnasphot")
+	Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> deleteAutomaticSnapshot")
 	defer Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace("<<<< deleteAutomaticSnapshot")
 
 	logFields := LogFields{
@@ -1232,7 +1233,7 @@ func (d *NASStorageDriver) deleteAutomaticSnapshot(
 		if errors.IsNotFoundError(err) {
 			Logc(ctx).WithFields(logFields).WithError(err).Debug("Volume for automatic snapshot not found, skipping cleanup.")
 		} else {
-			Logc(ctx).WithFields(logFields).WithError(err).Error("Error checking for automatic snashot volume. " +
+			Logc(ctx).WithFields(logFields).WithError(err).Error("Error checking for automatic snapshot volume. " +
 				"Any automatic snapshot must be manually deleted.")
 		}
 		return
@@ -1426,7 +1427,7 @@ func (d *NASStorageDriver) GetSnapshots(ctx context.Context, volConfig *storage.
 	snapshotsList := make([]*storage.Snapshot, 0)
 
 	for _, snapshot := range *snapshots {
-		// Filter out snapshots is an unavailable state
+		// Filter out snapshots in an unavailable state
 		if snapshot.Status != api.SnapshotStatusAvailable {
 			continue
 		}
@@ -1563,7 +1564,7 @@ func (d *NASStorageDriver) DeleteSnapshot(
 	Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> DeleteSnapshot")
 	defer Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace("<<<< DeleteSnapshot")
 
-	// Update resource cache as neeeded
+	// Update resource cache as needed
 	if err := d.API.RefreshOVHResources(ctx); err != nil {
 		return fmt.Errorf("could not update OVH resource cache; %v", err)
 	}
@@ -1645,7 +1646,9 @@ func (d *NASStorageDriver) List(ctx context.Context) ([]string, error) {
 }
 
 // Get tests for the existence of a volume.
-func (d *NASStorageDriver) Get(ctx context.Context, name string) error {
+func (d *NASStorageDriver) Get(ctx context.Context, volConfig *storage.VolumeConfig) error {
+	name := volConfig.InternalName
+
 	fields := LogFields{"Method": "Get", "Type": "NASStorageDriver"}
 	Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> Get")
 	defer Logd(ctx, d.Name(), d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace("<<<< Get")
@@ -1662,7 +1665,7 @@ func (d *NASStorageDriver) Get(ctx context.Context, name string) error {
 	return nil
 }
 
-// Resize increses a volume's quota.
+// Resize increases a volume's quota.
 func (d *NASStorageDriver) Resize(ctx context.Context, volConfig *storage.VolumeConfig, sizeBytes uint64) error {
 	name := volConfig.InternalName
 	fields := LogFields{
@@ -1681,7 +1684,7 @@ func (d *NASStorageDriver) Resize(ctx context.Context, volConfig *storage.Volume
 
 	// Update resource cache as needed
 	if err := d.API.RefreshOVHResources(ctx); err != nil {
-		return fmt.Errorf("could not update GCNV resource cache; %v", err)
+		return fmt.Errorf("could not update OVH EFS resource cache; %v", err)
 	}
 
 	// Get the volume
@@ -1761,7 +1764,7 @@ func (d *NASStorageDriver) getStorageBackendPools(ctx context.Context) []drivers
 	// For this driver, a discrete storage pool is composed of the following:
 	// 1. Capacity Pool - contains exactly one pool per EFS service, service ID being unique within a given Region.
 
-	// CapacityPoolsForStoragePools relies on a internal mapping of storage pools creted from the driver config.
+	// CapacityPoolsForStoragePools relies on an internal mapping of storage pools created from the driver config.
 	// If the behavior of that method should ever change, this method will need to change as well.
 	cPools := d.API.CapacityPoolsForStoragePools(ctx)
 	backendPools := make([]drivers.OVHNASStorageBackendPool, 0, len(cPools))
@@ -1913,7 +1916,7 @@ func (d *NASStorageDriver) GetVolumeExternalWrappers(ctx context.Context, channe
 	// Let the caller know we're done by closing the channel
 	defer close(channel)
 
-	// Update the resource cache as neeeded
+	// Update the resource cache as needed
 	if err := d.API.RefreshOVHResources(ctx); err != nil {
 		channel <- &storage.VolumeExternalWrapper{Volume: nil, Error: err}
 		return
@@ -1999,7 +2002,7 @@ func (d *NASStorageDriver) GetUpdateType(ctx context.Context, driverOrig storage
 func (d *NASStorageDriver) ReconcileNodeAccess(ctx context.Context, _ []*models.Node, _, _ string) error {
 	fields := LogFields{
 		"Method": "ReconcileNodeAccess",
-		"Type":   "NFSStorageDriver",
+		"Type":   "NASStorageDriver",
 	}
 	Logd(ctx, d.Config.StorageDriverName, d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace(">>>> ReconcileNodeAccess")
 	defer Logd(ctx, d.Config.StorageDriverName, d.Config.DebugTraceFlags["method"]).WithFields(fields).Trace("<<<< ReconcileNodeAccess")
@@ -2039,7 +2042,7 @@ func (d *NASStorageDriver) continueCreateVolume(ctx context.Context, volume *api
 		"volConfig": fmt.Sprintf("%+v", config),
 		"volume":    fmt.Sprintf("%+v", volume),
 	}
-	Logc(ctx).WithFields(fields).Info("confinueCreateVolume started")
+	Logc(ctx).WithFields(fields).Info("continueCreateVolume started")
 
 	err := d.waitForVolumeCreate(ctx, volume)
 	if err != nil {
