@@ -14,6 +14,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/ovh/go-ovh/ovh"
 
+	tridentConfig "github.com/netapp/trident/config"
 	. "github.com/netapp/trident/logging"
 	"github.com/netapp/trident/pkg/collection"
 	"github.com/netapp/trident/storage"
@@ -71,6 +72,9 @@ func NewDriver(config *ClientConfig) (OVHClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Set User-Agent to Trident version
+	httpClient.UserAgent = "Trident/" + tridentConfig.OrchestratorVersion.String()
 
 	sdkClient := &OVHEFSClient{
 		httpClient: httpClient,
