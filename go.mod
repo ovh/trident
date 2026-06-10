@@ -43,7 +43,7 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/openshift/api v0.0.0-20260205045418-81371d13d1fc
-	github.com/ovh/go-ovh v1.7.0
+	github.com/ovh/go-ovh v1.9.0
 	github.com/panjf2000/ants/v2 v2.11.5
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
