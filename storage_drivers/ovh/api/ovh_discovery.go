@@ -127,7 +127,7 @@ func (c Client) checkForUnsatisfiedPools(ctx context.Context) (discoveryErrors [
 			}
 
 			// Print the mapping in the logs so we see it after each discovery refresh.
-			Logc(ctx).Debug("Storage pool %s mapped to capacity pool %v.", sPoolName, cPoolNames)
+			Logc(ctx).Debugf("Storage pool %s mapped to capacity pool %v.", sPoolName, cPoolNames)
 		}
 	}
 

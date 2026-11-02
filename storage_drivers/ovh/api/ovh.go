@@ -251,7 +251,7 @@ func (c Client) Volumes(ctx context.Context) ([]*Volume, error) {
 
 		Logd(ctx, c.config.StorageDriverName, c.config.DebugTraceFlags["api"]).
 			WithFields(logFields).WithField("count", len(volumes)).
-			Debug("Read volumes from pool %s.", cPool.ID)
+			Debugf("Read volumes from pool %s.", cPool.ID)
 
 		for _, efsVol := range efsVolumes {
 			efsVol.ID = CreateVolumeID(cPool.ID, efsVol.ID)

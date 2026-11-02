@@ -2097,7 +2097,7 @@ func (d *NASStorageDriver) waitForExportRuleCreate(ctx context.Context, volume *
 		case api.ExportRuleStatusError:
 			// Delete a failed export rule
 			if errDelete := d.API.DeleteExportRule(ctx, volume, exportRule); errDelete != nil {
-				Logc(ctx).WithFields(logFields).WithError(errDelete).Error("Export rule could not be cleaned up and must be manually deleted: %v.", errDelete)
+				Logc(ctx).WithFields(logFields).WithError(errDelete).Errorf("Export rule could not be cleaned up and must be manually deleted: %v.", errDelete)
 			} else {
 				Logc(ctx).WithFields(logFields).Info("Cleanup of failed export rule started.")
 			}
