@@ -42,7 +42,7 @@ func getOVHClient() *Client {
 	config := ClientConfig{
 		ClientID:       "id",
 		ClientSecret:   "secret",
-		ClientLocation: "ovh-eu",
+		ClientLocation: ovh.OvhEU,
 		Location:       "eu-west-rbx",
 	}
 
@@ -72,7 +72,7 @@ func TestNewDriver(t *testing.T) {
 	config := ClientConfig{
 		ClientID:       "id",
 		ClientSecret:   "secret",
-		ClientLocation: "ovh-eu",
+		ClientLocation: ovh.OvhEU,
 		Location:       "eu-west-rbx",
 	}
 

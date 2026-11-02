@@ -245,7 +245,7 @@ func TestInitialize(t *testing.T) {
 "location": "eu-west-rbx",
 "clientID": "EU.1234",
 "clientSecret": "1234",
-"clientLocation": "ovh-eu",
+"clientLocation": "https://eu.api.ovh.com/1.0",
 "debugTraceFlags": {"method": true, "api": true, "discovery": true}
 }
 `
@@ -291,7 +291,7 @@ func TestInitialize_WithSecrets(t *testing.T) {
 "location": "eu-west-rbx",
 "clientID": "EU.1234",
 "clientSecret": "1234",
-"clientLocation": "ovh-eu",
+"clientLocation": "https://eu.api.ovh.com/1.0",
 "debugTraceFlags": {"method": true, "api": true, "discovery": true}
 }
 `

@@ -17,7 +17,7 @@ func getFakeSDK() *Client {
 	config := ClientConfig{
 		ClientID:       "id",
 		ClientSecret:   "secret",
-		ClientLocation: "ovh-eu",
+		ClientLocation: ovh.OvhEU,
 		Location:       "eu-west-rbx",
 	}
 
