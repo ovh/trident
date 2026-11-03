@@ -31,14 +31,19 @@ const (
 // RefreshOVHResources refreshes the cache of discovered OVH resources and validates
 // them against our known storage pools.
 func (c Client) RefreshOVHResources(ctx context.Context) error {
-	if time.Now().Before(c.sdkClient.OVHResources.lastUpdateTime.Add(c.config.MaxCacheAge)) {
+	stale, resourceUpdater, unlocker := c.sdkClient.resources.LockAndCheckStale(c.config.MaxCacheAge)
+
+	if !stale {
 		Logc(ctx).Debugf("Cached resources not yet %v old, skipping refresh.", c.config.MaxCacheAge)
+		unlocker()
 		return nil
 	}
 
 	// (re-)Discover OVH resources
 	Logc(ctx).Debugf("Discovering OVH resources.")
-	discoveryErr := multierr.Combine(c.DiscoverOVHResources(ctx))
+	discoveryErr := multierr.Combine(c.discoverOVHResources(ctx, resourceUpdater))
+	// Concurrent operations may continue after this point even if discovery failed
+	unlocker()
 
 	// This is noisy, hide it behind api tracing.
 	c.dumpOVHResources(ctx, c.config.StorageDriverName, c.config.DebugTraceFlags["api"])
@@ -54,7 +59,15 @@ func (c Client) RefreshOVHResources(ctx context.Context) error {
 }
 
 // DiscoverOVHResources rediscovers the OVH resources we care about and updates the cache.
-func (c Client) DiscoverOVHResources(ctx context.Context) (returnError error) {
+func (c Client) DiscoverOVHResources(ctx context.Context) error {
+	resourceUpdater, unlocker := c.sdkClient.resources.LockForDiscover()
+	defer unlocker()
+	return c.discoverOVHResources(ctx, resourceUpdater)
+}
+
+// discoverOVHResources rediscovers OVH resources and updates the cache via resourceUpdater.
+// Caller must hold the client's resources lock for the duration of this call.
+func (c Client) discoverOVHResources(ctx context.Context, resourceUpdater ovhResourceUpdater) (returnError error) {
 	// Start from scratch each time we're called.
 	newCapacityPoolsMap := make(map[string]*CapacityPool)
 
@@ -65,15 +78,14 @@ func (c Client) DiscoverOVHResources(ctx context.Context) (returnError error) {
 		}
 
 		// Swap the newly discovered resources into the cache only if discovery succeeded.
-		c.sdkClient.OVHResources.CapacityPoolMap = newCapacityPoolsMap
-		c.sdkClient.OVHResources.lastUpdateTime = time.Now()
+		resourceUpdater(time.Now(), newCapacityPoolsMap)
 
 		Logc(ctx).Debug("Switched to newly discovered resources.")
 	}()
 
 	// Discover capacity pools
-	cPools, returnErr := c.discoverCapacityPoolsWithRetry(ctx)
-	if returnErr != nil {
+	cPools, returnError := c.discoverCapacityPoolsWithRetry(ctx)
+	if returnError != nil {
 		return
 	}
 
@@ -102,17 +114,18 @@ func (c Client) DiscoverOVHResources(ctx context.Context) (returnError error) {
 func (c Client) dumpOVHResources(ctx context.Context, driverName string, discoveryTraceEnabled bool) {
 	Logd(ctx, driverName, discoveryTraceEnabled).Tracef("Discovered OVH Resources:")
 
-	for _, cp := range c.sdkClient.OVHResources.CapacityPoolMap {
+	c.sdkClient.resources.GetCapacityPools().Range(func(_ string, cp *CapacityPool) bool {
 		Logd(ctx, driverName, discoveryTraceEnabled).Tracef("CPool: %s, [%s, %s]",
 			cp.ID, cp.Name, cp.ServiceLevel)
-	}
+		return true
+	})
 }
 
 // checkForUnsatisfiedPools return one or more errors if one or more configured storage pools
 // are satisfied by no capacity pools.
 func (c Client) checkForUnsatisfiedPools(ctx context.Context) (discoveryErrors []error) {
 	// Ensure every storage pool matches one or more capacity pools
-	for sPoolName, sPool := range c.sdkClient.OVHResources.StoragePoolMap {
+	c.sdkClient.resources.GetStoragePools().Range(func(sPoolName string, sPool storage.Pool) bool {
 		// Find all capacity pools that work for this storage pool
 		cPools := c.CapacityPoolsForStoragePool(ctx, sPool, sPool.InternalAttributes()[serviceLevel])
 
@@ -129,7 +142,8 @@ func (c Client) checkForUnsatisfiedPools(ctx context.Context) (discoveryErrors [
 			// Print the mapping in the logs so we see it after each discovery refresh.
 			Logc(ctx).Debugf("Storage pool %s mapped to capacity pool %v.", sPoolName, cPoolNames)
 		}
-	}
+		return true
+	})
 
 	return
 }
@@ -137,12 +151,14 @@ func (c Client) checkForUnsatisfiedPools(ctx context.Context) (discoveryErrors [
 // checkForNonexistentCapacityPools logs warning if any configured capacity pools do not
 // match discovered capacity pools in the resource cache.
 func (c Client) checkForNonexistentCapacityPools(ctx context.Context) (anyMismatches bool) {
-	for sPoolName, sPool := range c.sdkClient.OVHResources.StoragePoolMap {
-		// Build list of short and long capacity pool names
-		cpNames := make([]string, 0)
-		for _, cacheCP := range c.sdkClient.OVHResources.CapacityPoolMap {
-			cpNames = append(cpNames, cacheCP.Name)
-		}
+	// Build list of short and long capacity pool names
+	cpNames := make([]string, 0)
+	c.sdkClient.resources.GetCapacityPools().Range(func(_ string, cacheCP *CapacityPool) bool {
+		cpNames = append(cpNames, cacheCP.Name)
+		return true
+	})
+
+	c.sdkClient.resources.GetStoragePools().Range(func(sPoolName string, sPool storage.Pool) bool {
 
 		// Find any capacity pools value in this storage pool that doesn't match known capacity pools
 		for _, configCP := range collection.SplitString(ctx, sPool.InternalAttributes()[capacityPools], ",") {
@@ -155,7 +171,8 @@ func (c Client) checkForNonexistentCapacityPools(ctx context.Context) (anyMismat
 				}).Warning("Capacity pool referenced in pool not found.")
 			}
 		}
-	}
+		return true
+	})
 
 	return
 }
@@ -264,16 +281,17 @@ func (c Client) ListStoragePools(ctx context.Context) ([]*CapacityPool, error) {
 func (c Client) CapacityPools() *[]*CapacityPool {
 	var cPools []*CapacityPool
 
-	for _, cPool := range c.sdkClient.OVHResources.CapacityPoolMap {
+	c.sdkClient.resources.GetCapacityPools().Range(func(_ string, cPool *CapacityPool) bool {
 		cPools = append(cPools, cPool)
-	}
+		return true
+	})
 
 	return &cPools
 }
 
 // capacityPool returns a single discovered capacity pool by its full name.
 func (c Client) capacityPool(cPoolFullName string) *CapacityPool {
-	return c.sdkClient.OVHResources.CapacityPoolMap[cPoolFullName]
+	return c.sdkClient.resources.GetCapacityPools().Get(cPoolFullName)
 }
 
 // CapacityPoolsForStoragePools returns all discovered capacity pools matching all known storage pools,
@@ -283,11 +301,12 @@ func (c Client) CapacityPoolsForStoragePools(ctx context.Context) []*CapacityPoo
 	cPoolMap := make(map[*CapacityPool]bool)
 
 	// Build deduplicated map of cPools
-	for _, sPool := range c.sdkClient.OVHResources.StoragePoolMap {
+	c.sdkClient.resources.GetStoragePools().Range(func(_ string, sPool storage.Pool) bool {
 		for _, cPool := range c.CapacityPoolsForStoragePool(ctx, sPool, "") {
 			cPoolMap[cPool] = true
 		}
-	}
+		return true
+	})
 
 	// Copy keys into a list of deduplicated cPools
 	cPools := make([]*CapacityPool, 0)
@@ -307,42 +326,48 @@ func (c Client) CapacityPoolsForStoragePool(
 	Logd(ctx, c.config.StorageDriverName, c.config.DebugTraceFlags["discovery"]).WithField("storagePool", sPool.Name()).
 		Tracef("Determining capacity pools for storage pool.")
 
+	// Take a consistent view of the cache, as it may be swapped by a concurrent refresh
+	capacityPoolMap := c.sdkClient.resources.GetCapacityPools()
+
 	// This map tracks which capacity pools have passed the filters
 	filteredCapacityPoolMap := make(map[string]bool)
 
 	// Start with all capacity pools marked as passing the filters
-	for cPoolFullName := range c.sdkClient.OVHResources.CapacityPoolMap {
+	capacityPoolMap.Range(func(cPoolFullName string, _ *CapacityPool) bool {
 		filteredCapacityPoolMap[cPoolFullName] = true
-	}
+		return true
+	})
 
 	// If capacity pools were specified, filter out non-matching capacity pools
 	cpList := collection.SplitString(ctx, sPool.InternalAttributes()[capacityPools], ",")
 	if len(cpList) > 0 {
-		for cPoolFullName, cPool := range c.sdkClient.OVHResources.CapacityPoolMap {
+		capacityPoolMap.Range(func(cPoolFullName string, cPool *CapacityPool) bool {
 			if !collection.ContainsString(cpList, cPool.Name) && !collection.ContainsString(cpList, cPoolFullName) {
 				Logd(ctx, c.config.StorageDriverName, c.config.DebugTraceFlags["discovery"]).Tracef("Ignoring capacity pool %s, not in capacity pools [%s].",
 					cPoolFullName, cpList)
 				filteredCapacityPoolMap[cPoolFullName] = false
 			}
-		}
+			return true
+		})
 	}
 
 	// Filter out pools with non-matching service levels
 	if serviceLevel != "" {
-		for cPoolFullName, cPool := range c.sdkClient.OVHResources.CapacityPoolMap {
+		capacityPoolMap.Range(func(cPoolFullName string, cPool *CapacityPool) bool {
 			if cPool.ServiceLevel != serviceLevel {
 				Logd(ctx, c.config.StorageDriverName, c.config.DebugTraceFlags["discovery"]).Tracef("Ignoring capacity pool %s, not service level %s.",
 					cPoolFullName, serviceLevel)
 				filteredCapacityPoolMap[cPoolFullName] = false
 			}
-		}
+			return true
+		})
 	}
 
 	// Build list of all capacity pools that have passed all filters
 	cPools := make([]*CapacityPool, 0)
 	for cPoolFullName, match := range filteredCapacityPoolMap {
 		if match {
-			cPools = append(cPools, c.sdkClient.OVHResources.CapacityPoolMap[cPoolFullName])
+			cPools = append(cPools, capacityPoolMap.Get(cPoolFullName))
 		}
 	}
 

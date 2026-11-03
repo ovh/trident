@@ -358,6 +358,7 @@ var (
 	// controller scalability is in technical preview.
 	ConcurrencyTechPreviewDrivers = []string{
 		"asa-r2",
+		"ovh-efs",
 	}
 
 	ValidProtocols = map[Protocol]bool{
@@ -450,6 +451,7 @@ var (
 		"ontap-nas-economy",
 		"ontap-san-economy",
 		"solidfire-san",
+		"ovh-efs",
 	}
 
 	// Absolute max age for ANY TAGRI (safety net to prevent stuck states) before forced deletion

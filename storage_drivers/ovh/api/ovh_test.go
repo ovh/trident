@@ -51,11 +51,12 @@ func getOVHClient() *Client {
 		config: &config,
 		sdkClient: &OVHEFSClient{
 			httpClient: httpClient,
+			resources:  newOVHResources(),
 		},
 	}
 
 	// Capacity pools
-	client.sdkClient.CapacityPoolMap = make(map[string]*CapacityPool)
+	cPoolMap := make(map[string]*CapacityPool)
 	cPool := &CapacityPool{
 		ID:           MockServiceID,
 		Name:         MockServiceID,
@@ -63,7 +64,9 @@ func getOVHClient() *Client {
 		ServiceLevel: "premium",
 		Status:       "available",
 	}
-	client.sdkClient.CapacityPoolMap[cPool.Name] = cPool
+	cPoolMap[cPool.Name] = cPool
+
+	client.sdkClient.resources.newDiscoveryUpdater()(time.Time{}, cPoolMap)
 
 	return client
 }

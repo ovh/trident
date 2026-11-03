@@ -52,7 +52,7 @@ type ClientConfig struct {
 
 type OVHEFSClient struct {
 	httpClient *ovh.Client
-	OVHResources
+	resources  *OVHResources
 }
 
 // Client encapsulates connection details.
@@ -78,6 +78,7 @@ func NewDriver(config *ClientConfig) (OVHClient, error) {
 
 	sdkClient := &OVHEFSClient{
 		httpClient: httpClient,
+		resources:  newOVHResources(),
 	}
 
 	return Client{
@@ -97,11 +98,13 @@ func (c Client) Init(ctx context.Context, pools map[string]storage.Pool) error {
 
 // registerStoragePools makes a note of pools defined by the driver for later mapping.
 func (c Client) registerStoragePools(sPools map[string]storage.Pool) {
-	c.sdkClient.OVHResources.StoragePoolMap = make(map[string]storage.Pool)
+	storagePools := make(map[string]storage.Pool, len(sPools))
 
 	for _, sPool := range sPools {
-		c.sdkClient.StoragePoolMap[sPool.Name()] = sPool
+		storagePools[sPool.Name()] = sPool
 	}
+
+	c.sdkClient.resources.SetStoragePools(storagePools)
 }
 
 // ///////////////////////////////////////////////////////////////////////////////
@@ -335,7 +338,7 @@ func (c Client) VolumeByMountPointName(ctx context.Context, mountPointName strin
 
 	var volumes []*Volume
 	var err error
-	for _, cPool := range c.sdkClient.CapacityPoolMap {
+	for _, cPool := range *c.CapacityPools() {
 		var matchingVolumes []*EFSVolume
 
 		// Mount point name is used as unique token as a service cannot have
@@ -569,7 +572,7 @@ func (c Client) CreateVolume(ctx context.Context, request *VolumeCreateRequest) 
 
 	// Get the capacity pool
 	cPoolFullName := cPoolName
-	_, ok := c.sdkClient.OVHResources.CapacityPoolMap[cPoolFullName]
+	_, ok := c.sdkClient.resources.GetCapacityPools().GetOk(cPoolFullName)
 	if !ok {
 		return nil, fmt.Errorf("unknown capacity pool %s", request.ServiceID)
 	}

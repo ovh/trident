@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jarcoal/httpmock"
 	"github.com/ovh/go-ovh/ovh"
@@ -26,11 +28,12 @@ func getFakeSDK() *Client {
 		config: &config,
 		sdkClient: &OVHEFSClient{
 			httpClient: httpClient,
+			resources:  newOVHResources(),
 		},
 	}
 
 	// Capacity pools
-	client.sdkClient.CapacityPoolMap = make(map[string]*CapacityPool)
+	cPoolMap := make(map[string]*CapacityPool)
 
 	cPool1 := &CapacityPool{
 		ID:           "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625",
@@ -39,7 +42,7 @@ func getFakeSDK() *Client {
 		ServiceLevel: PerformanceLevelPremium,
 		Status:       "available",
 	}
-	client.sdkClient.CapacityPoolMap[cPool1.Name] = cPool1
+	cPoolMap[cPool1.Name] = cPool1
 
 	cPool2 := &CapacityPool{
 		ID:           "bd68abb4-cc20-4ece-99ac-8d40e2d487f1",
@@ -48,7 +51,7 @@ func getFakeSDK() *Client {
 		ServiceLevel: PerformanceLevelPremium,
 		Status:       "available",
 	}
-	client.sdkClient.CapacityPoolMap[cPool2.Name] = cPool2
+	cPoolMap[cPool2.Name] = cPool2
 
 	cPool3 := &CapacityPool{
 		ID:           "0c7f3bf5-4f65-4b49-9c37-2870bf181a7d",
@@ -57,7 +60,7 @@ func getFakeSDK() *Client {
 		ServiceLevel: PerformanceLevelPremium,
 		Status:       "available",
 	}
-	client.sdkClient.CapacityPoolMap[cPool3.Name] = cPool3
+	cPoolMap[cPool3.Name] = cPool3
 
 	cPool4 := &CapacityPool{
 		ID:           "4088247d-902a-4bca-96bb-480bbb74de233",
@@ -66,7 +69,9 @@ func getFakeSDK() *Client {
 		ServiceLevel: PerformanceLevelPremium,
 		Status:       "available",
 	}
-	client.sdkClient.CapacityPoolMap[cPool4.Name] = cPool4
+	cPoolMap[cPool4.Name] = cPool4
+
+	client.sdkClient.resources.newDiscoveryUpdater()(time.Time{}, cPoolMap)
 
 	return client
 }
@@ -119,10 +124,46 @@ func TestDiscoverOVHResources(t *testing.T) {
 
 	assert.NoError(t, err)
 	//	assert.Equal(t, &expectedPools, result)
-	assert.Equal(t, 1, len(client.sdkClient.OVHResources.CapacityPoolMap))
-	assert.Equal(t, expectedCapacityPoolsPools, client.sdkClient.OVHResources.CapacityPoolMap)
+	assert.Equal(t, 1, client.sdkClient.resources.GetCapacityPools().Length())
+	client.sdkClient.resources.GetCapacityPools().Range(func(name string, cPool *CapacityPool) bool {
+		assert.Equal(t, expectedCapacityPoolsPools[name], cPool)
+		return true
+	})
 
 	httpmock.DeactivateAndReset()
+}
+
+func TestRefreshOVHResources_Concurrent(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	client := getFakeSDK()
+	client.config.MaxCacheAge = time.Hour
+
+	sPool := storage.NewStoragePool(nil, "pool")
+	sPool.InternalAttributes()[serviceLevel] = PerformanceLevelPremium
+	client.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool": sPool})
+
+	mockListStoragePoolsResponse()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, client.RefreshOVHResources(ctx))
+		}()
+		go func() {
+			defer wg.Done()
+			client.CapacityPoolsForStoragePools(ctx)
+			client.CapacityPools()
+		}()
+	}
+	wg.Wait()
+
+	// Only the first stale refresh should have hit the API
+	assert.Equal(t, 1, httpmock.GetCallCountInfo()["GET https://eu.api.ovh.com/1.0/storage/netapp"])
+	assert.Equal(t, 1, client.sdkClient.resources.GetCapacityPools().Length())
 }
 
 func TestDiscoverCapacityPools(t *testing.T) {
@@ -217,7 +258,7 @@ func TestCheckForUnsatisfiedPools_NoPools(t *testing.T) {
 	sPool2 := storage.NewStoragePool(nil, "pool2")
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2})
 
 	result := sdk.checkForUnsatisfiedPools(ctx)
 
@@ -231,7 +272,7 @@ func TestCheckForUnsatisfiedPools_EmptyPools(t *testing.T) {
 	sPool2.InternalAttributes()[capacityPools] = ""
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2})
 
 	result := sdk.checkForUnsatisfiedPools(ctx)
 
@@ -245,7 +286,7 @@ func TestCheckForUnsatisfiedPools_ValidPools(t *testing.T) {
 	sPool2.InternalAttributes()[capacityPools] = "0c7f3bf5-4f65-4b49-9c37-2870bf181a7d_0c7f3bf5-4f65-4b49-9c37-2870bf181a7d,4088247d-902a-4bca-96bb-480bbb74de23_4088247d-902a-4bca-96bb-480bbb74de23"
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2})
 
 	result := sdk.checkForUnsatisfiedPools(ctx)
 
@@ -259,7 +300,7 @@ func TestCheckForUnsatisfiedPools_OneInvalidPool(t *testing.T) {
 	sPool2.InternalAttributes()[capacityPools] = "af418bc6-f43c-4364-bfa7-b306eeb129d7"
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool1": sPool1, "pool2": sPool2})
 
 	result := sdk.checkForUnsatisfiedPools(ctx)
 
@@ -268,7 +309,7 @@ func TestCheckForUnsatisfiedPools_OneInvalidPool(t *testing.T) {
 
 func TestCheckForNonexistentCapacityPools_NoPools(t *testing.T) {
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = make(map[string]storage.Pool)
+	sdk.sdkClient.resources.SetStoragePools(make(map[string]storage.Pool))
 
 	result := sdk.checkForNonexistentCapacityPools(ctx)
 
@@ -280,7 +321,7 @@ func TestCheckForNonexistentCapacityPools_Empty(t *testing.T) {
 	sPool.InternalAttributes()[capacityPools] = ""
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool": sPool}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool": sPool})
 
 	result := sdk.checkForNonexistentCapacityPools(ctx)
 
@@ -292,7 +333,7 @@ func TestCheckForNonexistentCapacityPools_OK(t *testing.T) {
 	sPool.InternalAttributes()[capacityPools] = "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625_bc1f340a-6ee2-41e3-9ce5-5bcbed05b625,bd68abb4-cc20-4ece-99ac-8d40e2d487f1_bd68abb4-cc20-4ece-99ac-8d40e2d487f1"
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool": sPool}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool": sPool})
 
 	result := sdk.checkForNonexistentCapacityPools(ctx)
 	assert.False(t, result, "expected no error")
@@ -303,7 +344,7 @@ func TestCheckForNonexistentCapacityPools_Missing(t *testing.T) {
 	sPool.InternalAttributes()[capacityPools] = "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625_bc1f340a-6ee2-41e3-9ce5-5bcbed05b625,bd68abb4-cc20-4ece-99ac-8d40e2d487f1_bd68abb4-cc20-4ece-99ac-8d40e2d487f1,a072a3fe-2b18-4495-aca6-0d09b3636354"
 
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = map[string]storage.Pool{"pool": sPool}
+	sdk.sdkClient.resources.SetStoragePools(map[string]storage.Pool{"pool": sPool})
 
 	result := sdk.checkForNonexistentCapacityPools(ctx)
 
@@ -312,7 +353,7 @@ func TestCheckForNonexistentCapacityPools_Missing(t *testing.T) {
 
 func TestCapacityPools(t *testing.T) {
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = make(map[string]storage.Pool)
+	sdk.sdkClient.resources.SetStoragePools(make(map[string]storage.Pool))
 
 	expected := &[]*CapacityPool{
 		sdk.capacityPool("bc1f340a-6ee2-41e3-9ce5-5bcbed05b625_bc1f340a-6ee2-41e3-9ce5-5bcbed05b625"),
@@ -328,18 +369,19 @@ func TestCapacityPools(t *testing.T) {
 
 func TestCapacityPoolsForStoragePools(t *testing.T) {
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = make(map[string]storage.Pool)
+	storagePools := make(map[string]storage.Pool)
 
 	cPool1 := sdk.capacityPool("bc1f340a-6ee2-41e3-9ce5-5bcbed05b625_bc1f340a-6ee2-41e3-9ce5-5bcbed05b625")
 	cPool2 := sdk.capacityPool("bd68abb4-cc20-4ece-99ac-8d40e2d487f1_bd68abb4-cc20-4ece-99ac-8d40e2d487f1")
 
 	sPool1 := storage.NewStoragePool(nil, "testPool1")
 	sPool1.InternalAttributes()[capacityPools] = "0c7f3bf5-4f65-4b49-9c37-2870bf181a7d"
-	sdk.sdkClient.StoragePoolMap[sPool1.Name()] = sPool1
+	storagePools[sPool1.Name()] = sPool1
 
 	sPool2 := storage.NewStoragePool(nil, "testPool2")
 	sPool2.InternalAttributes()[capacityPools] = "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625_bc1f340a-6ee2-41e3-9ce5-5bcbed05b625,bd68abb4-cc20-4ece-99ac-8d40e2d487f1_bd68abb4-cc20-4ece-99ac-8d40e2d487f1"
-	sdk.sdkClient.StoragePoolMap[sPool2.Name()] = sPool2
+	storagePools[sPool2.Name()] = sPool2
+	sdk.sdkClient.resources.SetStoragePools(storagePools)
 
 	expected := []*CapacityPool{cPool1, cPool2}
 
@@ -393,7 +435,7 @@ func TestCapacityPoolsForStoragePool(t *testing.T) {
 
 func TestEnsureVolumeInValidCapacityPool(t *testing.T) {
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = make(map[string]storage.Pool)
+	storagePools := make(map[string]storage.Pool)
 
 	volume := &Volume{
 		ServiceID:     "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625",
@@ -403,14 +445,15 @@ func TestEnsureVolumeInValidCapacityPool(t *testing.T) {
 	sPool := storage.NewStoragePool(nil, "testPool")
 	sPool.InternalAttributes()[capacityPools] = "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625_bc1f340a-6ee2-41e3-9ce5-5bcbed05b625"
 
-	sdk.sdkClient.StoragePoolMap[sPool.Name()] = sPool
+	storagePools[sPool.Name()] = sPool
+	sdk.sdkClient.resources.SetStoragePools(storagePools)
 
 	assert.Nil(t, sdk.EnsureVolumeInValidCapacityPool(ctx, volume), "result not nil")
 }
 
 func TestEnsureVolumeInValidCapacityPool_NoPool(t *testing.T) {
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = make(map[string]storage.Pool)
+	sdk.sdkClient.resources.SetStoragePools(make(map[string]storage.Pool))
 
 	volume := &Volume{
 		ServiceID:     "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625",
@@ -422,7 +465,7 @@ func TestEnsureVolumeInValidCapacityPool_NoPool(t *testing.T) {
 
 func TestEnsureVolumeInValidCapacityPool_BadPool(t *testing.T) {
 	sdk := getFakeSDK()
-	sdk.sdkClient.StoragePoolMap = make(map[string]storage.Pool)
+	storagePools := make(map[string]storage.Pool)
 
 	volume := &Volume{
 		ServiceID:     "bc1f340a-6ee2-41e3-9ce5-5bcbed05b625",
@@ -432,7 +475,8 @@ func TestEnsureVolumeInValidCapacityPool_BadPool(t *testing.T) {
 	sPool := storage.NewStoragePool(nil, "testPool")
 	sPool.InternalAttributes()[capacityPools] = "bd68abb4-cc20-4ece-99ac-8d40e2d487f1_bd68abb4-cc20-4ece-99ac-8d40e2d487f1"
 
-	sdk.sdkClient.StoragePoolMap[sPool.Name()] = sPool
+	storagePools[sPool.Name()] = sPool
+	sdk.sdkClient.resources.SetStoragePools(storagePools)
 
 	result := sdk.EnsureVolumeInValidCapacityPool(ctx, volume)
 
