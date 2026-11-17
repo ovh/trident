@@ -1398,6 +1398,7 @@ type PersistentStorageBackendConfig struct {
 	SolidfireConfig         *drivers.SolidfireStorageDriverConfig `json:"solidfire_config,omitempty"`
 	AzureConfig             *drivers.AzureNASStorageDriverConfig  `json:"azure_config,omitempty"`
 	GCNVConfig              *drivers.GCNVStorageDriverConfig      `json:"gcnv_config,omitempty"`
+	OVHConfig               *drivers.OVHNASStorageDriverConfig    `json:"ovh_config,omitempty"`
 	FakeStorageDriverConfig *drivers.FakeStorageDriverConfig      `json:"fake_config,omitempty"`
 }
 
@@ -1413,6 +1414,8 @@ func (psbc *PersistentStorageBackendConfig) GetDriverConfig() (drivers.DriverCon
 		driverConfig = psbc.AzureConfig
 	case psbc.GCNVConfig != nil:
 		driverConfig = psbc.GCNVConfig
+	case psbc.OVHConfig != nil:
+		driverConfig = psbc.OVHConfig
 	case psbc.FakeStorageDriverConfig != nil:
 		driverConfig = psbc.FakeStorageDriverConfig
 	default:
@@ -1472,6 +1475,8 @@ func (p *BackendPersistent) MarshalConfig() (string, error) {
 		bytes, err = json.Marshal(p.Config.AzureConfig) //nolint:gosec // intentional persisted backend config
 	case p.Config.GCNVConfig != nil:
 		bytes, err = json.Marshal(p.Config.GCNVConfig)
+	case p.Config.OVHConfig != nil:
+		bytes, err = json.Marshal(p.Config.OVHConfig)
 	case p.Config.FakeStorageDriverConfig != nil:
 		bytes, err = json.Marshal(p.Config.FakeStorageDriverConfig) //nolint:gosec // intentional persisted backend config
 	default:
